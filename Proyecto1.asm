@@ -287,39 +287,66 @@ evaluate_term:
 parse_exponent:
     push rbp
     mov rbp, rsp
-    push rbx       ; preservar rbx
-    sub rsp, 8
-
+    sub rsp, 16
+    
     call parse_factor
-    mov [rbp-16], rax  ; guardar base
-
-.check_pow:
+    mov [rbp-8], rax
+    
+.loop:
     call skip_spaces
+    
+    ; Verifica si hay operador de exponente
     cmp byte [rdi], '*'
-    jne .done
-    cmp byte [rdi + 1], '*'
-    jne .done
-
-    add rdi, 2         ; saltar '**'
-    call parse_exponent
-    mov rcx, rax       ; exponente
-    mov rax, [rbp-16]  ; base
-
-    mov rbx, rax       ; base en rbx
-    mov rax, 1         ; resultado inicial
-
-    test rcx, rcx
-    jz .done           ; si exponente = 0, resultado = 1
-
-.pow_loop:
-    imul rax, rbx
-    dec rcx
-    jnz .pow_loop
-
-.done:
-    add rsp, 8
-    pop rbx
+    jne .end
+    cmp byte [rdi+1], '*'
+    jne .end
+    
+    ; Avanza sobre los dos asteriscos
+    add rdi, 2
+    call skip_spaces
+    
+    ; Parsea el exponente (derecha)
+    call parse_factor
+    mov rbx, rax        ; RBX = exponente
+    mov rax, [rbp-8]    ; RAX = base
+    
+    ; Maneja exponente negativo
+    cmp rbx, 0
+    jge .positive_exp
+    neg rbx
+    call .do_pow
+    mov rbx, rax
+    mov rax, 1
+    cqo
+    idiv rbx
+    jmp .store_result
+    
+.positive_exp:
+    call .do_pow
+    
+.store_result:
+    mov [rbp-8], rax
+    jmp .loop
+    
+.end:
+    mov rax, [rbp-8]
+    add rsp, 16
     pop rbp
+    ret
+    
+.do_pow:
+    ; RAX = base, RBX = exponente
+    push rcx
+    mov rcx, rbx
+    dec rcx
+    jle .pow_done      ; Si exponente es 0 o 1
+    
+.pow_loop:
+    imul rax, [rbp-8]
+    loop .pow_loop
+    
+.pow_done:
+    pop rcx
     ret
 ; ********** FIN FUNCIÓN CORREGIDA **********
 
